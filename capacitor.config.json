@@ -1,0 +1,6 @@
+{
+  "appId": "com.silversky3d.tagofwar",
+  "appName": "TugOfWar",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

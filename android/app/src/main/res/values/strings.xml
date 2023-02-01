@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TugOfWar</string>
+    <string name="title_activity_main">TugOfWar</string>
+    <string name="package_name">com.silversky3d.tagofwar</string>
+    <string name="custom_url_scheme">com.silversky3d.tagofwar</string>
+</resources>
