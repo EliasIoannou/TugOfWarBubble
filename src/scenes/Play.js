@@ -21,7 +21,7 @@ class Play extends Phaser.Scene{
 
         this.speechBubblesEnemy = ['You are the definition of worthlessness.','How can you even look yourself in the mirror?','I am certain it is not a pretty picture.','Have you seen Jessica? \nShe has a new boyfriend again. \n\nYet... you are alone.',
             'Oh surprise surprise, here come the waterworks again. Why are you even crying you are doing nothing to improve your situation.','There are people suffering from deadly diseases and hunger and you are crying for meaningless stuff.',
-            'You are suffering from what exactly? Not being hot enough? Not being liked enough? Not being PERFECT ENOUGH?','Oh cry me a river, rocket science is not simple. This however, is. \nI have been with you since that day Riley called you fat in front of your friends in Middle School.',
+            'You are suffering from what exactly? Not being hot enough? Not being liked enough? Not being PERFECT ENOUGH?','I have been with you since that day Riley called you fat in front of your friends in Middle School.',
             'Do you remember that day?\nOf course you do.','You started watching what you ate in front of people. Feeling weird everytime you opened your mouth because someone might mention something.'
         ];
         this.speechBubblesAlly = [];
@@ -51,28 +51,39 @@ class Play extends Phaser.Scene{
         this.stopMovingPlayer=false;
         this.currentPhase=1;
         
-        this.spawnSpeed= 900;
-        this.changeAmount =50;
-        this.minimum =400;
+        this.spawnSpeed= 600;
+        this.changeAmount =100;
+        this.minimum =200;
         this.amountToChange=10;
         this.currentAmount=1;
+        //powerBar
         this.fill=null;
         this.bar=null;
-        
+        this.body=null
+        //
         this.hint=null;
         this.edgePlayer=null;
         this.edgeEnemy=null;
+        this.ropePlayer=null;
+        this.ropeEnemy=null;
+        this.ropeMiddle=null;
         
         this.startedChaosMode = false;
         this.startTweenAnim=false;
+        this.stopDragging=false;
         this.upDownTween=null;
         this.upDownTween2=null;
+        this.letgo=null;
     }
     
     create () {
+        initAnims(this.anims);
         this.add.image(400, 300, 'sky').setDepth(-10).setScale(1.4);
         this.groupChaosBubbles = this.add.group();
         this.groupChaosContent = this.add.group();
+        this.piecesToMove = this.add.group();
+        
+        
         //this.createPowerBar();
         // this.createConversationBubbles();
         // this.createBtn();
@@ -80,45 +91,69 @@ class Play extends Phaser.Scene{
         // this.createOptionBubbles();
         //this.scoreDisplay = new HealthBar(this,10,10,2,this.score);
         //this.ropes = this.createRope();
+        
         this.createGround();
         this.createPlayer();
         this.createCollisionsWithEdge();
-        initAnims(this.anims);
+        
         
         //const rope = this.add.rope(50,50,'rope',null,12);
         let rand = Math.round(Math.random()*(this.randomInsults.length-1));
         //this.createBubblePhase2(this.randomInsults[rand]);
-        this.time.delayedCall(2000,()=>{
-            this.createBubblePhase1(this.speechBubblesEnemy[this.index]);
+        let playButton = this.add.image(this.config.width/2,this.config.height/2,'playButton').setDepth(90);
+        playButton.setInteractive();
+        playButton.on('pointerover',()=>{
+            playButton.setTexture('playButtonHover')
+        })
+        playButton.on('pointerout',()=>{
+            playButton.setTexture('playButton')
+        })
+        playButton.on('pointerup',()=>{
+            playButton.destroy();
+            this.time.delayedCall(1000,()=>{
+                this.createBubblePhase1(this.speechBubblesEnemy[this.index]);
+            })
         })
         
         
+        
     }
-    createPowerBar(){
-        let initialScale = 0.1;
-        if(this.fill) return;
-        this.fill=this.add.image(600, 100, 'fill').setScale(initialScale)
+    clickedPlay(){
         
-        
-        this.bar=this.add.image(600, 100, 'bar').setScale(initialScale);
-        
-        let body=this.add.image(520, 100, 'body').setScale(initialScale).setOrigin(0.2,0.5);
-        body.setInteractive();
-        
-        body.on('pointerup',()=>{
+    }
+    addEventListenerToBody(){
+        this.body.on('pointerup',()=>{
             if(this.score>=this.fill.width){
+                if(this.letgo)
+                    this.letgo.disableInteractive();
                 this.totalScore+=this.score;
                 this.score=0;
                 this.animationScore=0;
                 this.fill.setCrop(0,0, this.score,this.fill.height);
                 if(this.currentPhase===2) {
-                    this.createSpecialBubble("NOW YOU MADE ME MAD!!", 1000, false);
+                    this.upDownTween.stop(0);
+                    this.upDownTween2.stop(0);
+                    this.startTweenAnim=false;
                     this.startedChaosMode = true;
-                    this.time.delayedCall(2000, () => {
-                        this.upDownTween.stop(0);
-                        this.upDownTween2.stop(0);
-                        this.startTweenAnim=false;
-                        this.startChaosMode();
+                    this.events.addListener("update", (time, delta) => {
+                        if(this.stopDragging) return;
+                        if(!this.stopMovingEnemy){
+                            this.piecesToMove.children.iterate(item=>{
+                                item.setVelocityX(-432);
+                            })
+                        }else{
+                            this.piecesToMove.children.iterate(item=>{
+                                item.setVelocityX(0);
+                            })
+                        }
+                    })
+                    this.time.delayedCall(1000, () => {
+                        this.stopDragging=true;
+                        this.createSpecialBubble("NOW YOU MADE ME MAD!!", 1000, false);
+                        this.time.delayedCall(1000,()=>{
+                            this.startChaosMode();
+                        })
+
                     })
                 }else if(this.currentPhase===3){
                     this.upDownTween.stop(0);
@@ -126,9 +161,22 @@ class Play extends Phaser.Scene{
                     this.startTweenAnim=false;
                     this.startChaosMode();
                 }
-                
+
             }
         })
+    }
+    createPowerBar(){
+        let initialScale = 0.1;
+        if(this.fill) return;
+        this.fill=this.add.image(this.config.width/2, this.config.height-100, 'fill').setScale(initialScale).setDepth(15);
+        
+        
+        this.bar=this.add.image(this.config.width/2, this.config.height-100, 'bar').setScale(initialScale).setDepth(15);
+        
+        this.body=this.add.image((this.config.width/2)-80, this.config.height-100, 'body').setScale(initialScale).setOrigin(0.2,0.5).setDepth(15);
+        this.body.setInteractive();
+
+        this.addEventListenerToBody();
         let goUp=0;
         //in update!
         // if(fill.width<goup) return;
@@ -143,11 +191,11 @@ class Play extends Phaser.Scene{
             if (rotationAmount <= 360) {
                 //rotationAmount -= 360;
                 this.fill.setRotation(Phaser.Math.DegToRad(rotationAmount));
-                body.setRotation(Phaser.Math.DegToRad(rotationAmount));
+                this.body.setRotation(Phaser.Math.DegToRad(rotationAmount));
                 this.bar.setRotation(Phaser.Math.DegToRad(rotationAmount));
             }else{
                 this.fill.setRotation(Phaser.Math.DegToRad(0));
-                body.setRotation(Phaser.Math.DegToRad(0));
+                this.body.setRotation(Phaser.Math.DegToRad(0));
                 this.bar.setRotation(Phaser.Math.DegToRad(0));
                 if(this.bar.width<goUp) return;
                 goUp+=delta*0.4;
@@ -159,12 +207,15 @@ class Play extends Phaser.Scene{
             if(initialScale>=1) return;
             initialScale+=delta*0.002;
             this.fill.setScale(initialScale);
-            body.setScale(initialScale);
+            this.body.setScale(initialScale);
             this.bar.setScale(initialScale);
-            
+
             
         });
-        
+        this.groupPowerBar = this.add.group();
+        this.groupPowerBar.add(this.bar);
+        this.groupPowerBar.add(this.fill);
+        this.groupPowerBar.add(this.body);
         
     }
     createCollisionsWithEdge(){
@@ -181,6 +232,26 @@ class Play extends Phaser.Scene{
         
         
     }
+    createNormalBubble(quote,timeToDestroy){
+        let bubble = this.add.image(this.enemy.x-128, this.enemy.y-400, 'bubble').setOrigin(0);
+        let bubbleHeight = 180;
+        let bubblePadding = 15;
+        bubble.setInteractive();
+        let content = this.add.text(0, 0, quote, { fontFamily: 'Arial', fontSize: 20, color: '#000000', align: 'center', wordWrap: { width: bubble.width - (bubblePadding * 2) } });
+        let b = content.getBounds();
+        content.setPosition(bubble.x + (bubble.width / 2) - (b.width / 2), bubble.y + (bubbleHeight / 2) - (b.height / 2));
+        let ignoreDelayedSpawn = false;
+        bubble.on("pointerup",()=> {
+            bubble.destroy();
+            content.destroy();
+            ignoreDelayedSpawn = true;
+        })
+        this.time.delayedCall(timeToDestroy,()=> {
+            if (ignoreDelayedSpawn) return;
+            bubble.destroy();
+            content.destroy();
+        })
+    }
     createSpecialBubble(quote,timeToDestroy,pull=true){
         let bubble = this.add.image(this.enemy.x-128, this.enemy.y-400, 'bubble').setOrigin(0);
         let bubbleHeight = 180;
@@ -195,16 +266,21 @@ class Play extends Phaser.Scene{
             content.destroy();
             ignoreDelayedSpawn = true;
             if(pull){
-                
-                this.player.body.setVelocityX(-438);
-                this.enemy.body.setVelocityX(-438); 
+
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(-438);
+                })
             }
             this.time.delayedCall(500, () => {
                 if(pull) {
-                    this.player.body.setVelocityX(0);
-                    this.enemy.body.setVelocityX(0);
+                    this.piecesToMove.children.iterate(item=>{
+                        item.setVelocityX(0);
+                        if(this.body)
+                            this.body.setInteractive();
+                    })
                 }
                 this.time.delayedCall(2000, () => {
+                    if(this.currentPhase===3) return;
                     this.startPhase2();
                     this.createPowerBar();
                 })
@@ -219,16 +295,21 @@ class Play extends Phaser.Scene{
             bubble.destroy();
             content.destroy();
             if(pull) {
-                this.player.body.setVelocityX(-438);
-                this.enemy.body.setVelocityX(-438);
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(-438);
+                })
             }
             
             this.time.delayedCall(500, () => {
                 if(pull) {
-                    this.player.body.setVelocityX(0);
-                    this.enemy.body.setVelocityX(0);
+                    this.piecesToMove.children.iterate(item=>{
+                        item.setVelocityX(0);
+                        if(this.body)
+                            this.body.setInteractive();
+                    })
                 }
                 this.time.delayedCall(2000, () => {
+                    if(this.currentPhase===3) return;
                     this.startPhase2();
                     this.createPowerBar();
                 })
@@ -239,11 +320,27 @@ class Play extends Phaser.Scene{
         this.index=0;
         if(!this.startedChaosMode)
             this.currentPhase=2;
+        
         this.time.delayedCall(1000,()=>{
             this.createBubblePhase1(this.speechBubblesEnemy[this.index]);
             this.time.delayedCall(1000,()=>{
-                if(!this.hint)
-                    this.hint = this.add.text(this.config.width/3, 20, "Smash the bubbles", { fontFamily: 'Arial', fontSize: 42, color: '#000000', align: 'center'});
+                if(!this.hint){
+                    this.time.delayedCall(1500,()=>{
+                        this.hint = this.add.image(this.config.width/2, this.config.height/2,'hint1').setScale(0.2).setDepth(90);
+                        this.time.delayedCall(1500, () => {
+                            this.hint.destroy();
+                            this.hint = this.add.image(this.config.width / 2, this.config.height / 2, 'hint2').setScale(0.2).setDepth(90);
+                            this.time.delayedCall(2000, () => {
+                                this.hint.destroy();
+                            })
+                        })
+                        
+                    })
+                    
+                    
+                }
+                    
+                    //this.hint = this.add.text(this.config.width/3, 20, "Smash the bubbles", { fontFamily: 'Arial', fontSize: 42, color: '#000000', align: 'center'});
             })
         })
         
@@ -254,11 +351,11 @@ class Play extends Phaser.Scene{
             this.createBubblePhase2(this.generateRandomInsult());
         else if(this.currentPhase===3){
             this.startedChaosMode=false;
-            this.createSpecialBubble("huff, huff, huff, you'll...never win",2500,false)
+            this.createNormalBubble("huff, huff, huff, you'll...never win",2500)
             this.groupChaosBubbles.children.iterate(item=>{
                 
                 item.setActive(false).setVisible(false);
-            }) 
+            })
             this.groupChaosContent.children.iterate(item=>{
                 item.setActive(false).setVisible(false);
             })
@@ -267,25 +364,63 @@ class Play extends Phaser.Scene{
                     this.hint.destroy();
                     this.hint = this.add.text(this.config.width/3, 20, "Maybe it's time to...", { fontFamily: 'Arial', fontSize: 42, color: '#000000', align: 'center'});
                     //Create let go button here.
+                    if(this.letgo)
+                        this.letgo.destroy();
+                    this.letgo = this.add.image(this.config.width/2,this.config.height*7/10,'letgo').setOrigin(0.5).setDepth(40);
+                    this.letgo.setInteractive();
+                    this.letgo.on('pointerup',()=>{
+                        this.startLetGoMode();
+                    })
+                    this.time.delayedCall(6000,()=>{
+                        if(this.letgo)
+                            this.letgo.setVisible(false);
+                    })
                 })
                 this.startedChaosMode=true;
                 this.createBubblePhase2(this.generateRandomInsult());
             })
+        }else if(this.currentPhase===4){
+            
         }
-        
-        this.currentPhase=3;
+        if(this.currentPhase!==4)
+            this.currentPhase=3;
+    }
+    
+    startLetGoMode(){
+        this.currentPhase=4;
+        this.letgo.destroy();
+        this.groupChaosBubbles.children.iterate(item=>{
+
+            item.setActive(false).setVisible(false);
+        })
+        this.groupChaosContent.children.iterate(item=>{
+            item.setActive(false).setVisible(false);
+        })
+        this.groupPowerBar.children.iterate(item=>{
+
+            item.setActive(false).setVisible(false);
+        })
+        this.piecesToMove.children.iterate(item=>{
+            item.setVelocityY(-70);
+        })
+        this.hint.text = "ASCEND MY CHILDREN!"
+        let finalScore = this.score+this.totalScore;
+        let finalScoreText = this.add.text(this.config.width/2, this.config.height/2, "Your final score is: "+finalScore, { fontFamily: 'Arial', fontSize: 24, color: '#000000', align: 'center'});
+
     }
     createBubblePhase1(quote, timeToDestroy = 4000){
         if(!this.speechBubblesEnemy[this.index] || this.startedChaosMode) return;
         
         let bubble = this.add.image(this.enemy.x-128, this.enemy.y-400, 'bubble').setOrigin(0);
         
-        if(!this.stopMovingPlayer && !this.stopMovingEnemy) {
-            this.player.body.setVelocityX(73);
-            this.enemy.body.setVelocityX(73);
+        if(!this.stopMovingPlayer) {
+            this.piecesToMove.children.iterate(item=>{
+                item.setVelocityX(73);
+            })
             this.time.delayedCall(500, () => {
-                this.player.body.setVelocityX(0);
-                this.enemy.body.setVelocityX(0);
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(0);
+                })
                 bubble.setInteractive();
                 bubble.input.hitArea.setTo(3,15,240,150);
             })
@@ -308,15 +443,18 @@ class Play extends Phaser.Scene{
             if(this.currentPhase===2) {
                 let rand = Math.round(Math.random()*4)+5;
                 plusText = this.add.text(0, 0, "+"+rand, {
-                    fontFamily: 'Arial',
+                    fontFamily: 'Bauhaus',
                     fontSize: 48,
                     color: '#67ff00',
                     align: 'center',
+                    stroke: '#ffffff',
+                    strokeThickness: 6,
+                    fill: '#43d637',
                     wordWrap: {width: bubble.width - (bubblePadding * 2)}
                 });
 
                 let b = plusText.getBounds();
-
+                
                 plusText.setPosition(bubble.x + (bubble.width / 2) - (b.width / 2), bubble.y + ((bubbleHeight) / 2) - (b.height / 2));
                 plusText.y += 80;
                 this.events.addListener("update", (time, delta) => {
@@ -327,12 +465,16 @@ class Play extends Phaser.Scene{
                 
                 
             }
-            this.player.body.setVelocityX(-20);
-            this.enemy.body.setVelocityX(-20);
-            this.time.delayedCall(400, () => {
-                this.player.body.setVelocityX(0);
-                this.enemy.body.setVelocityX(0);
-            })
+            if(!this.stopMovingEnemy) {
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(-20);
+                })
+                this.time.delayedCall(400, () => {
+                    this.piecesToMove.children.iterate(item=>{
+                        item.setVelocityX(0);
+                    })
+                })
+            }
             bubble.destroy();
             content.destroy();
             this.time.delayedCall(500,()=>{
@@ -365,9 +507,75 @@ class Play extends Phaser.Scene{
             this.index++;
             this.createBubblePhase1(this.speechBubblesEnemy[this.index])
         }else{
+            if(this.body)
+                this.body.disableInteractive();
             this.createSpecialBubble("I AM NOT DONE WITH YOU YET!",4000);
             specialTextCreation = false;
         }
+        
+    }
+    secondPhasePushback(){
+        
+        
+        this.startedChaosMode=false;
+        
+        this.groupChaosBubbles.children.iterate(item=>{
+            if(!item.active){
+                return;
+            }
+            item.setActive(false).setVisible(false);
+        })
+        this.groupChaosContent.children.iterate(item=>{
+            if(!item.active){
+                return;
+            } 
+            let plusText;
+            
+            plusText = this.add.text(0, 0, "-5", {
+                fontFamily: 'Bauhaus',
+                fontSize: 48,
+                color: '#ff0000',
+                align: 'center',
+                stroke: '#ffffff',
+                strokeThickness: 6,
+                fill: '#ff0000',
+            });
+
+            let b = plusText.getBounds();
+
+            plusText.setPosition(item.x + (item.width / 2) - (b.width / 2), item.y + ((item.height/2) / 2) - (b.height / 2));
+            plusText.y += 80;
+            this.events.addListener("update", (time, delta) => {
+                plusText.y -= 4;
+            });
+            this.time.delayedCall(500,()=>{
+                plusText.destroy();
+            })
+            item.setActive(false).setVisible(false);
+        })
+        if(this.letgo)
+            this.letgo.disableInteractive();
+        this.time.delayedCall(1000,()=>{
+            this.createSpecialBubble("I AM NOT DONE WITH YOU YET!",3000,false);
+            this.time.delayedCall(3000,()=>{
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(-432);
+                })
+                this.time.delayedCall(500, () => {
+                    this.piecesToMove.children.iterate(item=>{
+                        item.setVelocityX(0);
+                        if(this.letgo)
+                            this.letgo.setInteractive();
+                    })
+                })
+                this.time.delayedCall(1500,()=>{
+                    this.startedChaosMode=true;
+                    this.createBubblePhase2(this.generateRandomInsult());
+                })
+            })
+        })
+        
+        
         
     }
     createBubblePhase2(quote){
@@ -376,19 +584,26 @@ class Play extends Phaser.Scene{
         let x = Math.random() * (this.config.width-300);
         let y = Math.random() * (this.config.height-300);
         
-        
+        let rand = Math.floor(Math.random() * 3) + 1;
+        let bubble;
         // create the bubble sprite
-        let bubble = this.add.image(x, y, 'bubbleNoArrow').setOrigin(0);
+        switch (rand){
+            case 1:
+                bubble = this.add.image(x, y, 'bubbleNoArrow').setOrigin(0);
+                break;
+            case 2:
+                bubble = this.add.image(x, y, 'bubbleNoArrow2').setOrigin(0);
+                break;
+            case 3:
+                bubble = this.add.image(x, y, 'bubbleNoArrow3').setOrigin(0);
+                break;
+        }
+        
 
         // set the bubble to be interactive
         bubble.setInteractive();
         bubble.input.hitArea.setTo(3,15,240,150);
-        this.player.body.setVelocityX(40);
-        this.enemy.body.setVelocityX(40);
-        this.time.delayedCall(100, () => {
-            this.player.body.setVelocityX(0);
-            this.enemy.body.setVelocityX(0);
-        })
+        
         // listen for a click event on the bubble
         let bubbleHeight = 180;
         let bubblePadding = 15;
@@ -397,6 +612,20 @@ class Play extends Phaser.Scene{
         let b = content.getBounds();
 
         content.setPosition(bubble.x + (bubble.width / 2) - (b.width / 2), bubble.y + (bubbleHeight / 2) - (b.height / 2));
+        if(!this.stopMovingPlayer) {
+            this.piecesToMove.children.iterate(item=>{
+                item.setVelocityX(40);
+            })
+            this.time.delayedCall(100, () => {
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(0);
+                })
+            })
+        }else{
+            bubble.setVisible(false).setActive(false);
+            content.setVisible(false).setActive(false);
+            this.secondPhasePushback();
+        }
         bubble.on("pointerup",()=>{
             bubble.destroy();
             content.destroy();
@@ -404,15 +633,18 @@ class Play extends Phaser.Scene{
             
             let rand = Math.round(Math.random() * 4) + 5;
             plusText = this.add.text(0, 0, "+" + rand, {
-                fontFamily: 'Arial',
+                fontFamily: 'Bauhaus',
                 fontSize: 48,
                 color: '#67ff00',
                 align: 'center',
+                stroke: '#ffffff',
+                strokeThickness: 6,
+                fill: '#43d637',
                 wordWrap: {width: bubble.width - (bubblePadding * 2)}
             });
 
             let b = plusText.getBounds();
-
+            
             plusText.setPosition(bubble.x + (bubble.width / 2) - (b.width / 2), bubble.y + ((bubbleHeight) / 2) - (b.height / 2));
             plusText.y += 80;
             this.events.addListener("update", (time, delta) => {
@@ -422,14 +654,19 @@ class Play extends Phaser.Scene{
             this.time.delayedCall(500,()=>{
                 plusText.destroy();
             })
-            this.player.body.setVelocityX(-40);
-            this.enemy.body.setVelocityX(-40);
-            this.time.delayedCall(100, () => {
-                this.player.body.setVelocityX(0);
-                this.enemy.body.setVelocityX(0);
-            })
+            if(!this.stopMovingEnemy) {
+                this.piecesToMove.children.iterate(item=>{
+                    item.setVelocityX(-40);
+                })
+                this.time.delayedCall(100, () => {
+                    this.piecesToMove.children.iterate(item=>{
+                        item.setVelocityX(0);
+                    })
+                })
+            }
         })
         this.time.delayedCall(this.spawnSpeed,()=>{
+            if( this.currentPhase===4) return;
             let rand = Math.round(Math.random()*(this.randomInsults.length-1));
             this.createBubblePhase2(this.randomInsults[rand]);
             console.log(" "+this.currentAmount)
@@ -439,7 +676,7 @@ class Play extends Phaser.Scene{
                     this.currentAmount++;
                 else{
                     this.spawnSpeed-=this.changeAmount;
-                    this.amountToChange*=2;
+                    this.amountToChange*=1.4;
                     this.currentAmount=0;
                 }
             }
@@ -449,12 +686,45 @@ class Play extends Phaser.Scene{
         this.groupChaosContent.add(content);
     }
     
-
+    //zooming functionality
+/*let zoomNum=1;
+        let goToX=this.config.width/2;
+        let goToY=this.config.height/2;
+        let timer=0;
+        this.events.addListener("update",(time,delta)=>{
+            timer+=delta/1000;
+            
+            if(timer<=4) return;
+            if(timer>=8) return;
+            if(zoomNum<=3)
+                zoomNum+=delta*0.001;
+            this.cameras.main.setZoom(zoomNum);
+            if(goToX<this.player.x)
+                goToX+=delta*0.1;
+            if(goToY<this.player.y)
+                goToY+=delta*0.1;
+            if(goToX>this.player.x)
+                goToX-=delta*0.1;
+            if(goToY>this.player.y)
+                goToY-=delta*0.1;
+            this.cameras.main.centerOn(goToX, goToY);
+        })*/
     createPlayer(){
-        this.player =this.physics.add.sprite(this.config.width*1.5/8,  this.config.height*7.33/10, 'girl').setOrigin(0.5);
-        this.enemy= this.physics.add.sprite(this.config.width*5.5/8,  this.config.height*7.33/10, 'girl').setFlipX(true).setTint(0xFF0000).setDepth(20).setOrigin(0.5);
-        this.player.body.setSize(30,128);
-        this.enemy.body.setSize(30,128);
+        this.player =this.physics.add.sprite(this.config.width*1.5/8,  this.config.height*5.6/10, 'girl').setOrigin(0.5).setDepth(20).setScale(0.25);
+        this.enemy= this.physics.add.sprite(this.config.width*5.5/8,  this.config.height*5.6/10, 'girlEnemy').setDepth(20).setOrigin(0.5).setScale(0.25);
+        this.ropePlayer = this.physics.add.sprite(this.config.width*1.95/8,  this.config.height*5.6/10, 'rope').setScale(0.5).setDepth(30);
+        this.ropeEnemy =this.physics.add.sprite(this.config.width*5.05/8,  this.config.height*5.6/10, 'rope').setScale(0.5).setDepth(30).setFlipX(true);
+        this.ropeMiddle =this.physics.add.sprite(this.config.width*3.6/8,  this.config.height*5.185/10, 'ropeMiddle').setScale(0.5).setDepth(20).setScale(.5,0.192);
+        
+        
+        this.player.body.setSize(50,128);
+        //this.player.body.offset.y=20;
+        this.enemy.body.setSize(50,128);
+        this.piecesToMove.add(this.player);
+        this.piecesToMove.add(this.enemy);
+        this.piecesToMove.add(this.ropePlayer);
+        this.piecesToMove.add(this.ropeEnemy);
+        this.piecesToMove.add(this.ropeMiddle);
     }
     // createRespond(){
     //     this.respondButton = this.createDialogueOptions(225,500,400,80,100,'Respond');
@@ -555,9 +825,9 @@ class Play extends Phaser.Scene{
     createGround(){
         let ground =[];
         let distance = -20;
-        ground.push(this.add.image(distance, 0, 'groundBigger').setOrigin(0).setDepth(-1));
+        ground.push(this.add.image(distance, 0, 'groundBigger').setOrigin(0).setDepth(10));
         distance+=40;
-        ground.push(this.add.image(distance, 0, 'groundBigger').setOrigin(0).setDepth(-1).setFlipX(true));
+        ground.push(this.add.image(distance, 0, 'groundBigger').setOrigin(0).setDepth(10).setFlipX(true));
         
     }
     
@@ -625,39 +895,23 @@ class Play extends Phaser.Scene{
             this.player.angle-=.727*delta;
         if(this.startRotationEnemy)
             this.enemy.angle+=30;
-        //this.handleHealth(delta);
-        // if(this.enemy.x<550.0 && !this.doOnce){
-        //     this.pauseConv=true;
-        //     this.timer=4;
-        //     this.doOnce=true;
-        //     let conv=this.createSpeechBubble(this.speechBubbleEnemyX,50, 200,200,this.generateCatchPhrase());
-        //     this.time.delayedCall(3000,()=>{
-        //         this.player.setVelocityX(100);
-        //         this.enemy.setVelocityX(100);
-        //         this.time.delayedCall(500,()=>{
-        //             this.player.setVelocityX(0);
-        //             this.enemy.setVelocityX(0);
-        //             this.doOnce=false;
-        //             this.pauseConv=false;
-        //             conv.bubble.visible=false;
-        //             conv.content.visible=false;
-        //         })
-        //     })
-        // }else{
-        //     //this.handleSpeech(this.timer);
-        // }
         
 
-        if(!this.enemyDefeated)
+        if(!this.enemyDefeated){
             this.player.play('girl-pulling',true);
+            this.ropePlayer.play('rope-pulling', true);
+        }
 
-        if(time/1000>3&&!this.enemyDefeated)
-            this.enemy.play('girl-pulling',true);
 
-        // this.ropes.forEach(rope => {
-        //     rope.setX(rope.x -100);
 
-        // });
+        this.enemy.play('girl-pulling2',true);
+        
+        if(time/1000>2&&!this.enemyDefeated){
+            
+            this.ropePlayer.play('rope-pulling', true);
+            this.ropeEnemy.play('rope-pulling', true);
+        }
+            
 
     }
 
